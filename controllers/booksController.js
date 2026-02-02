@@ -1,417 +1,459 @@
-import fs from "fs";
+
+
+import Borrow from "../models/borrowModel.js";
+import User from "../models/usersModel.js";
+import Book from "../models/booksModel.js";
+
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
-const BOOKS_PATH = `${__dirname}/../dev-data/books.json`;
-const BORROWS_PATH = `${__dirname}/../dev-data/borrow.json`;
-let borrowSheet = JSON.parse(fs.readFileSync(BORROWS_PATH));
-let books = JSON.parse(fs.readFileSync(BOOKS_PATH));
 
-// GET ALL
-const getBooks = (req, res) => {
-  res.status(200).json({
-    status: "success",
-    results: books.length,
-    data: { books },
-  });
+
+
+
+// Done
+const getBooks = async (req, res) => {
+  try {
+    // 1. Fetch all books
+    // .select('-__v') removes the internal Mongoose version key
+    const books = await Book.find().select('-__v');
+
+    // 2. Send Response
+    res.status(200).json({
+      status: "success",
+      results: books.length,
+      data: { books },
+    });
+
+  } catch (error) {
+    // 3. Handle Server Errors
+    // Use 500 (Server Error) because if this fails, the DB is down.
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve books from database",
+    });
+  }
 };
 
-// GET ONE
-const getBook = (req, res) => {
-  const id = Number(req.params.id);
-  if (isNaN(id) || id <= 0) {
-    return res.status(400).json({
-      status: "fail",
-      message: "Invalid book ID. Must be a positive number",
-    });
-  }
-  const book = books.find((el) => el.id === id);
+// Done
+const getBook = async (req, res) => {
+  try {
+    // 1. Find the book
+    const book = await Book.findById(req.params.id).select('-__v');
 
-  if (!book) {
-    return res.status(404).json({
-      status: "fail",
-      message: "book not found",
-    });
-  }
-  res.status(200).json({
-    status: "success",
-    data: { book },
-  });
-};
-
-const addBook = (req, res) => {
-  // Validation
-  const { title, author, category, isbn, available } = req.body;
-
-  if (!title || !author || !category || !isbn) {
-    return res.status(400).json({
-      status: "fail",
-      message: "Title, author,ispn, and category are required",
-    });
-  }
-
-  if (typeof title !== "string" || title.trim() === "") {
-    return res.status(400).json({
-      status: "fail",
-      message: "Title must be a non-empty string",
-    });
-  }
-
-  if (typeof author !== "string" || author.trim() === "") {
-    return res.status(400).json({
-      status: "fail",
-      message: "Author must be a non-empty string",
-    });
-  }
-  if (isbn !== undefined) {
-    if (
-      typeof isbn !== "string" ||
-      !/^\d{10}$|^\d{13}$/.test(isbn.replace(/-/g, ""))
-    ) {
-      return res.status(400).json({
+    // 2. CRITICAL: Check if book is null (ID format was valid, but no record found)
+    if (!book) {
+      return res.status(404).json({
         status: "fail",
-        message: "ISBN must be 10 or 13 digits (dashes allowed)",
+        message: "Book not found",
       });
     }
-  }
 
-  // Check for duplicate
-  const duplicate = books.find(
-    (b) => b.title.toLowerCase() === title.trim().toLowerCase()
-  );
-  if (duplicate) {
-    return res.status(409).json({
-      status: "fail",
-      message: "A book with this title already exists",
+    // 3. Send Success Response
+    res.status(200).json({
+      status: "success",
+      data: { book },
+    });
+
+  } catch (error) {
+    // 4. Handle Invalid IDs or Server Errors
+    // If the ID is the wrong format (e.g. "123" instead of ObjectId), Mongoose throws a CastError
+    if (error.name === 'CastError') {
+       return res.status(400).json({
+         status: "fail",
+         message: "Invalid ID format",
+       });
+    }
+
+    res.status(500).json({
+      status: "error",
+      message: "Server Error",
     });
   }
+};
 
-  const newId = books.length > 0 ? books[books.length - 1].id + 1 : 1;
-  const newBook = {
-    id: newId,
-    title: title.trim(),
-    author: author.trim(),
-    isbn: isbn.trim(),
-    category: category.trim(),
-    available: available !== undefined ? Boolean(available) : true,
-  };
+// Done
+const addBook = async (req, res) => {
+  try {
+    // 1. Create the book
+    // You can pass req.body directly because the Schema acts as a filter.
+    // However, destructuring is safer if you want to strictly control inputs.
+    const newBook = await Book.create(req.body);
 
-  books.push(newBook);
-  fs.writeFile(BOOKS_PATH, JSON.stringify(books, null, 2), (err) => {
-    if (err) {
-      return res.status(500).json({
-        status: "error",
-        message: "Failed to save book",
-      });
-    }
     res.status(201).json({
       status: "success",
       data: { book: newBook },
     });
-  });
-};
 
-const editBook = (req, res) => {
-  const id = Number(req.params.id);
-
-  if (isNaN(id) || id <= 0) {
-    return res.status(400).json({
-      status: "fail",
-      message: "Invalid book ID",
-    });
-  }
-
-  const book = books.find((b) => b.id === id);
-  if (!book) {
-    return res.status(404).json({
-      status: "fail",
-      message: "Book not found",
-    });
-  }
-
-  const { title, author, category, available } = req.body;
-
-  if (!title && !author && !category && available === undefined) {
-    return res.status(400).json({
-      status: "fail",
-      message: "At least one field must be provided for update",
-    });
-  }
-
-  // Validate each field
-
-  if (title !== undefined) {
-    if (typeof title !== "string" || title.trim() === "") {
-      return res.status(400).json({
+  } catch (error) {
+    // 2. Handle Duplicate ISBN Error (Mongoose Error Code 11000)
+    if (error.code === 11000) {
+      return res.status(409).json({ // 409 Conflict
         status: "fail",
-        message: "Title must be a non-empty string",
+        message: "A book with this ISBN already exists",
       });
     }
-    book.title = title.trim();
-  }
 
-  if (author !== undefined) {
-    if (typeof author !== "string" || author.trim() === "") {
-      return res.status(400).json({
-        status: "fail",
-        message: "Author must be a non-empty string",
-      });
-    }
-    book.author = author.trim();
+    // 3. Handle Validation Errors (Missing Title, too short, etc.)
+    res.status(400).json({
+      status: "fail",
+      message: error.message, // Send the specific validation error to the user
+    });
   }
-
-  if (category !== undefined) {
-    if (typeof category !== "string" || category.trim() === "") {
-      return res.status(400).json({
-        status: "fail",
-        message: "Category must be a non-empty string",
-      });
-    }
-    book.category = category.trim();
-  }
-
-  if (available !== undefined) {
-    book.available = Boolean(available);
-  }
-
-  fs.writeFile(BOOKS_PATH, JSON.stringify(books, null, 2), (err) => {
-    if (err) {
-      return res.status(500).json({ status: "error", message: "Save failed" });
-    }
-    res.json({ status: "success", data: { book } });
-  });
 };
-
-// DELETE BOOK
-const deleteBook = (req, res) => {
-  const id = Number(req.params.id);
-  if (isNaN(id) || id <= 0) {
-    return res.status(400).json({
-      status: "fail",
-      message: "Invalid book ID. Must be a positive number",
-    });
-  }
-  const bookIndex = books.findIndex((b) => b.id === id);
-  if (bookIndex === -1) {
-    return res.status(404).json({
-      status: "fail",
-      message: "Book not found",
-    });
-  }
-
-  books.splice(bookIndex, 1);
-
-  fs.writeFile(BOOKS_PATH, JSON.stringify(books, null, 2), (err) => {
-    if (err) {
-      console.error("Delete save failed:", err);
-      return res.status(500).json({ message: "Save failed" });
-    }
-    res.status(204).send();
-  });
-};
-
-// RETURN BOOK
-const bookStatus = (req, res) => {
-  const bookId = Number(req.params.id);
-  if (isNaN(bookId) || bookId <= 0) {
-    return res.status(400).json({
-      status: "fail",
-      message: "Invalid book ID. Must be a positive number",
-    });
-  }
-  const book = books.find((b) => b.id === bookId);
-  if (!book) return res.status(404).json({ message: "Book not found" });
-  if (book.available)
-    return res.status(400).json({ message: "Already available" });
-
-  book.available = true;
-  book.borrowedBy = null;
-  book.borrowedAt = null;
-  book.dueDate = null;
-
-  const borrowRecord = borrowSheet.find(
-    (b) => b.bookId === bookId && !b.returned
-  );
-  if (borrowRecord) {
-    borrowRecord.returned = true;
-    borrowRecord.returnDate = new Date().toLocaleDateString("en-CA");
-  }
-
-  // Save books
-  fs.writeFile(BOOKS_PATH, JSON.stringify(books, null, 2), (err) => {
-    if (err) console.error("Books save failed:", err);
-  });
-
-  // Save borrows + respond
-  fs.writeFile(BORROWS_PATH, JSON.stringify(borrowSheet, null, 2), (err) => {
-    if (err) {
-      console.error("Borrows save failed:", err);
-      return res.status(500).json({ message: "Save failed" });
-    }
-    res.json({
-      message: "Book returned! Thank you",
-      book: { id: book.id, title: book.title, available: true },
-      returnedOn: borrowRecord?.returnDate,
-    });
-  });
-};
-
-const serachBook = (req, res) => {
-  const q = req.query.q?.toLowerCase().trim();
-  if (!q) {
-    return res.status(400).json({ message: "Query 'q' is required" });
-  }
-  const results = books.filter(
-    (book) =>
-      book.title?.toLowerCase().includes(q) ||
-      book.author?.toLowerCase().includes(q)
-  );
-
-  res.status(200).json({
-    status: "success",
-    results: results.length,
-    data: results,
-  });
-};
-
-const filterBook = (req, res) => {
-  const category = req.query.category?.toLowerCase().trim();
-  if (!category) {
-    return res.status(400).json({ message: "Query 'category' is required" });
-  }
-
-  const results = books.filter(
-    (book) => book.category?.toLowerCase() === category
-  );
-
-  res.status(200).json({
-    status: "success",
-    results: results.length,
-    data: results,
-  });
-};
-
-const exportBooks = (req, res) => {
-  console.log("Export Books - Full query:", req.query);
-  console.log("Export Books - userId:", req.query.userId);
-
-  const userId = Number(req.query.userId);
-
-  console.log("Export Books - userId as number:", userId);
-  console.log("Export Books - isNaN check:", isNaN(userId));
-
-  if (!userId || isNaN(userId)) {
-    console.log("Export Books - REJECTED: Invalid userId");
-    return res.status(401).json({
-      status: "fail",
-      message: "User ID is required and must be a valid number",
-    });
-  }
-
-  const USERS_PATH = `${__dirname}/../dev-data/users.json`;
-  const users = JSON.parse(fs.readFileSync(USERS_PATH));
-  const user = users.find((u) => u.id === userId);
-
-  console.log("Export Books - User found:", user);
-
-  if (!user) {
-    console.log("Export Books - REJECTED: User not found");
-    return res.status(403).json({
-      status: "fail",
-      message: "User not found",
-    });
-  }
-
-  if (user.role !== "admin") {
-    console.log("Export Books - REJECTED: User is not admin, role:", user.role);
-    return res.status(403).json({
-      status: "fail",
-      message: "Only admins can export data",
-    });
-  }
+// Done
+const editBook = async (req, res) => {
   try {
-    // Read fresh book data directly from the file
-    const freshBooksData = JSON.parse(fs.readFileSync(BOOKS_PATH));
+    const updatedBook = await Book.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true } // valid for new Schema
+    );
 
-    console.log("Export Books - SUCCESS: Exporting books data");
+    // Check if ID was valid format but document didn't exist
+    if (!updatedBook) {
+      return res.status(404).json({ 
+        status: "fail", 
+        message: "Book not found" 
+      });
+    }
 
-    const csv = [
-      "id,title,author,category,isbn,available",
-      ...freshBooksData.map(
-        (b) =>
-          `${b.id},${b.title},${b.author},${b.category || ""},${b.isbn},${b.available}`
-      ),
-    ].join("\n");
+    res.status(200).json({
+      status: "success",
+      data: { book: updatedBook },
+    });
 
+  } catch (error) {
+    // 1. Handle Duplicate ISBN (e.g., changing ISBN to one that exists)
+    if (error.code === 11000) {
+        return res.status(409).json({
+            status: 'fail',
+            message: 'A book with this ISBN already exists'
+        });
+    }
+
+    // 2. Handle Invalid ID format (e.g., "123" instead of ObjectId)
+    if (error.name === 'CastError') {
+        return res.status(400).json({
+            status: 'fail',
+            message: 'Invalid Book ID format'
+        });
+    }
+
+    // 3. Handle Validation Errors (e.g. invalid stock number)
+    res.status(400).json({
+      status: "fail",
+      message: error.message, 
+    });
+  }
+};
+
+// Done
+const deleteBook = async (req, res) => {
+  try {
+    const bookId = req.params.id;
+
+    // 1. Delete the book
+    const deletedBook = await Book.findByIdAndDelete(bookId);
+
+    // 2. Check if book existed
+    if (!deletedBook) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Book not found",
+      });
+    }
+
+    // 3. Delete all borrow records for this book
+    // This prevents "orphan" data (Borrow records pointing to a book that doesn't exist)
+    await Borrow.deleteMany({ bookId: bookId });
+
+    res.status(200).json({
+      status: "success",
+      message: "Book and its history deleted successfully",
+    });
+
+  } catch (error) {
+    // 4. Handle Invalid ID format
+    if (error.name === 'CastError') {
+       return res.status(400).json({
+         status: "fail",
+         message: "Invalid Book ID format",
+       });
+    }
+
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+// Done 
+
+const returnBook = async (req, res) => {
+  try {
+    const bookId = req.params.id; 
+
+    // 1. Find the Book
+    const book = await Book.findById(bookId);
+
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
+    }
+
+    // 2. Check if already returned
+    if (book.available) {
+      return res.status(400).json({ message: "Book is already marked as available" });
+    }
+
+    // 3. Update the Book Availability
+    // We ONLY need to update 'available'. 
+    // The history is now safely stored in the 'Borrow' collection.
+    book.available = true;
+    await book.save();
+
+    // 4. Update the active Borrow Record
+    const borrowRecord = await Borrow.findOne({ 
+        bookId: book._id, 
+        returned: false // Find the one that is currently active
+    });
+
+    let returnedOnDate = null;
+
+    if (borrowRecord) {
+      returnedOnDate = new Date(); // Use a real Date object
+      
+      borrowRecord.returned = true;
+      borrowRecord.returnDate = returnedOnDate;
+      
+      await borrowRecord.save();
+    }
+
+    // 5. Send Response
+    res.status(200).json({
+      status: "success",
+      message: "Book returned! Thank you",
+      data: {
+        book: { 
+            id: book._id, 
+            title: book.title, 
+            available: true 
+        },
+        returnedOn: returnedOnDate
+      }
+    });
+
+  } catch (error) {
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+       return res.status(400).json({ status: "fail", message: "Invalid Book ID format" });
+    }
+    
+    res.status(500).json({
+      status: "error",
+      message: error.message
+    });
+  }
+};
+
+
+// Done
+
+const searchBook = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+
+    // 1. Validate Input
+    if (!q) {
+      return res.status(400).json({ message: "Query 'q' is required" });
+    }
+
+    // 2. ESCAPE special regex characters to prevent crashes
+    // If user searches for "(Harry", this turns it into "\(Harry" so it's treated as text.
+    const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 3. Create Regex
+    const searchRegex = new RegExp(safeQuery, 'i');
+
+    // 4. Search with $or (Title OR Author)
+    const results = await Book.find({
+      $or: [
+        { title: searchRegex },
+        { author: searchRegex },
+        { category: searchRegex }, // Added category for better UX
+        { isbn: searchRegex }      // Added ISBN for exact finding
+      ]
+    }).select('-__v'); // Clean output
+
+    res.status(200).json({
+      status: "success",
+      results: results.length,
+      data: { books: results },
+    });
+
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// Done
+const filterBook = async (req, res) => {
+  try {
+    const category = req.query.category?.trim();
+    
+    // 1. Validate Input
+    if (!category) {
+      return res.status(400).json({ message: "Query 'category' is required" });
+    }
+
+    // 2. Escape special characters (Fixes crash on "Sci-Fi" or "C++")
+    const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 3. Find Books
+    // matches strictly (^...$) but ignores case ('i')
+    const results = await Book.find({
+      category: new RegExp(`^${safeCategory}$`, 'i') 
+    }).select('-__v');
+
+    res.status(200).json({
+      status: "success",
+      results: results.length,
+      data: { books: results }, // Consistent formatting
+    });
+
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
+  }
+};
+// Done
+const exportBooks = async (req, res) => {
+  try {
+    const userId = req.query.userId; 
+
+    // 1. Check if user exists (using Mongo ID)
+    // We check valid format to prevent CastErrors if a bad ID is sent
+    if (!userId || userId.length !== 24) {
+         return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(403).json({ status: "fail", message: "User not found" });
+    }
+
+    if (user.role !== "admin") {
+      return res.status(403).json({ status: "fail", message: "Only admins can export data" });
+    }
+
+    // 2. Fetch all books
+    const books = await Book.find().select('-__v').lean(); 
+
+    // 3. Define Helper for CSV Safety
+    // This wraps text in quotes so commas inside titles don't break the file
+    const escapeCsv = (text) => {
+        if (!text) return "";
+        return `"${text.toString().replace(/"/g, '""')}"`; // Escape existing quotes
+    };
+
+    // 4. Generate CSV Header and Rows
+    const headers = "ID,Title,Author,Category,ISBN,Available,Stock";
+    const rows = books.map((b) => {
+      return [
+        b._id,
+        escapeCsv(b.title),
+        escapeCsv(b.author),
+        escapeCsv(b.category),
+        escapeCsv(b.isbn),
+        b.available,
+        b.stock || 0
+      ].join(",");
+    });
+
+    const csvContent = [headers, ...rows].join("\n");
+
+    // 5. Send Response
     res.header("Content-Type", "text/csv");
-    res.attachment("books.csv");
-    return res.send(csv);
+    res.attachment("books_export.csv"); // This prompts the browser download
+    return res.status(200).send(csvContent);
+
   } catch (err) {
-    console.error("Export Books Error:", err);
+    console.error("Export Error:", err);
     return res.status(500).json({ status: "error", message: "Export failed" });
   }
 };
 
-const exportHistory = (req, res) => {
-  console.log("Export History - Full query:", req.query);
-  console.log("Export History - userId:", req.query.userId);
+const exportHistory = async (req, res) => {
+  try {
+    const userId = req.query.userId; 
 
-  const userId = Number(req.query.userId);
+    // 1. Validation (Must be a valid MongoDB ID string)
+    if (!userId || userId.length !== 24) {
+      return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
+    }
 
-  console.log("Export History - userId as number:", userId);
-  console.log("Export History - isNaN check:", isNaN(userId));
+    // 2. Admin Check using Mongoose ID
+    const user = await User.findById(userId);
 
-  if (!userId || isNaN(userId)) {
-    console.log("Export History - REJECTED: Invalid userId");
-    return res.status(401).json({
-      status: "fail",
-      message: "User ID is required and must be a valid number",
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ 
+        status: "fail", 
+        message: "Access denied: Admins only" 
+      });
+    }
+
+    // 3. Fetch History AND Populate Names/Titles
+    // This replaces the ID codes with the actual objects from the other tables
+    const borrows = await Borrow.find()
+      .populate('userId', 'name email')  // Get User Name & Email
+      .populate('bookId', 'title')       // Get Book Title
+      .lean(); 
+
+    // 4. Helper for Date Formatting (YYYY-MM-DD)
+    const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : "";
+
+    // 5. Generate Readable CSV
+    const csvRows = borrows.map(b => {
+      // Handle cases where User or Book might have been deleted
+      const userName = b.userId ? b.userId.name : "Deleted User";
+      const userEmail = b.userId ? b.userId.email : "N/A";
+      const bookTitle = b.bookId ? b.bookId.title : "Deleted Book";
+      
+      // Escape commas in titles/names to prevent CSV errors
+      const safeTitle = `"${bookTitle.replace(/"/g, '""')}"`;
+      const safeName = `"${userName.replace(/"/g, '""')}"`;
+
+      return [
+        b._id,
+        safeTitle,     // Actual Book Title
+        safeName,      // Actual User Name
+        userEmail,
+        formatDate(b.borrowDate),
+        formatDate(b.dueDate),
+        b.returned ? "Yes" : "No",
+        formatDate(b.returnDate)
+      ].join(",");
+    });
+
+    // Add Header Row
+    const headers = "BorrowID,Book Title,User Name,User Email,Borrowed On,Due Date,Returned,Returned On";
+    const csvContent = [headers, ...csvRows].join("\n");
+
+    // 6. Send File
+    res.header("Content-Type", "text/csv");
+    res.attachment("borrow_history.csv");
+    res.status(200).send(csvContent);
+
+  } catch (error) {
+    console.error("Export Error:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to export history",
     });
   }
-
-  const USERS_PATH = `${__dirname}/../dev-data/users.json`;
-  const users = JSON.parse(fs.readFileSync(USERS_PATH));
-  const user = users.find((u) => u.id === userId);
-
-  console.log("Export History - User found:", user);
-
-  if (!user) {
-    console.log("Export History - REJECTED: User not found");
-    return res.status(403).json({
-      status: "fail",
-      message: "User not found",
-    });
-  }
-
-  if (user.role !== "admin") {
-    console.log(
-      "Export History - REJECTED: User is not admin, role:",
-      user.role
-    );
-    return res.status(403).json({
-      status: "fail",
-      message: "Only admins can export data",
-    });
-  }
-
-  console.log("Export History - SUCCESS: Exporting for admin user");
-
-  const csv = [
-    "borrowId,bookId,userId,borrowedOn,dueDate,returned,returnedOn",
-    ...borrowSheet.map(
-      (b) =>
-        // Ensure these keys (b.borrowDate, b.dueDate, etc.) match
-        // the actual property names in your borrow.json file.
-        `${b.id},${b.bookId},${b.userId},${b.borrowDate || ""},${b.dueDate || ""},${b.returned},${b.returnDate || ""}`
-    ),
-  ].join("\n");
-
-  res.header("Content-Type", "text/csv");
-  res.attachment("history.csv");
-  res.send(csv);
 };
 
 export {
@@ -420,11 +462,9 @@ export {
   addBook,
   editBook,
   deleteBook,
-  bookStatus,
-  serachBook,
+  returnBook,
+  searchBook,
   filterBook,
   exportBooks,
   exportHistory,
-  books,
-  borrowSheet,
 };

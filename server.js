@@ -1,14 +1,29 @@
-import { app } from "./app.js";
+
 import dotenv from "dotenv";
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+import dns from "dns";
+import { app } from "./app.js";
 
 dotenv.config();
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error("Missing MONGODB_URI in environment (set it in .env)");
+  process.exit(1);
+}
 
-mongoose.connect(process.env.MONGODB_URI).then(() => {
-  console.log("Connected to MongoDB");
-}).catch((err) => {
-  console.error("Error connecting to MongoDB:", err);
-});
+
+dns.setServers(['8.8.8.8','1.1.1.1']);
+
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log("Connected to MongoDB");
+  })
+  .catch((err) => {
+    console.error("Error connecting to MongoDB", err);
+    process.exit(1);
+  }); 
+
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

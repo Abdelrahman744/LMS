@@ -1,47 +1,53 @@
-import fs from "fs";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import User from '../models/usersModel.js'; // Adjust path
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+ const protect = async (req, res, next) => {
+  try {
+    // Check for ID in Body (POST/PATCH) or Query (GET)
+    let userId = req.body.userId || req.body.id || req.query.userId;
 
-const restrictTo = (...allowedRoles) => {
-  return (req, res, next) => {
-    // Get user ID from request body
-    const userId = req.body.id || req.body.userId;
-
+    // 1. Check if ID exists
     if (!userId) {
       return res.status(401).json({
         status: "fail",
-        message: "Authentication required. Please provide user ID",
+        message: "You are not logged in. Please provide user ID.",
       });
     }
 
-    // Look up user's REAL role from users.json
-    const users = JSON.parse(
-      fs.readFileSync(`${__dirname}/../dev-data/users.json`)
-    );
-    const user = users.find((u) => u.id === Number(userId));
+    // 2. Check if User exists in DB
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(401).json({
         status: "fail",
-        message: "User not found",
+        message: "The user belonging to this ID no longer exists.",
       });
     }
 
-    // Check if user's role is allowed
-    if (!allowedRoles.includes(user.role)) {
+    // 3. SUCCESS: Attach user to the request
+    req.user = user; 
+    next(); // Move to the next middleware (restrictTo)
+
+  } catch (error) {
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+         return res.status(400).json({ status: 'fail', message: 'Invalid User ID format' });
+    }
+    res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// 2. RESTRICT TO: The "VIP List"
+// Checks if the user has the right role
+ const restrictTo = (...allowedRoles) => {
+  return (req, res, next) => {
+    // We can access req.user because 'protect' ran first!
+    if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         status: "fail",
-        message: `Access denied. ${allowedRoles.join(" or ")} privileges required.`,
+        message: "You do not have permission to perform this action",
       });
     }
-
-    // Attach user to request for use in controllers
-    req.user = user;
     next();
   };
 };
-
-export { restrictTo };
+export { protect, restrictTo };
