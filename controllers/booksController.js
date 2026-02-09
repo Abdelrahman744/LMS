@@ -311,7 +311,9 @@ const filterBook = async (req, res) => {
 
     // 2. Escape special characters (Fixes crash on "Sci-Fi" or "C++")
     const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+     
 
+  
     // 3. Find Books
     // matches strictly (^...$) but ignores case ('i')
     const results = await Book.find({

@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+
 
 const userSchema = new mongoose.Schema({
-  // Mongoose creates _id automatically. 
-  // If you want to keep your old IDs (1, 2, 3) for migration, uncomment the next line:
-  // id: { type: Number, unique: true }, 
+
 
   name: {
     type: String,
@@ -34,17 +35,60 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  passwordResetToken: String,
+  passwordResetExpires: Date,
+  passwordChangedAt: Date,
+  activated: {
+    type: Boolean,
+    default: true,
+    select: false 
+
+  }
+  
+});
+
+userSchema.pre('save', async function (next){
+  if (!this.isModified('password')) return next(); 
+
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
   }
 });
 
+userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
+ return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+userSchema.pre('save', function(next) {
+  if (!this.isModified('password') || this.isNew) return next();
+
+  this.passwordChangedAt = Date.now() - 1000; 
+  next();
+});
+
+userSchema.pre(/^find/, function(next) {
+  this.find({ activated: { $ne: false } });
+  next();
+}); 
+
+
+
+
+userSchema.methods.createPasswordResetToken = function() {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;  
+  return resetToken;
+};
+
 const User = mongoose.model('User', userSchema);
 
-const admin1 = new User({
-  name: 'Admin User',
-  email: 'admin@example.com',
-  password: 'securepassword',
-  role: 'admin'
-});
-admin1.save();
+
+
 
 export default User;

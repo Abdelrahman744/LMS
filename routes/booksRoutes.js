@@ -10,7 +10,7 @@ const Router = express.Router();
 // ============================================================
 
 // Public Routes
-Router.route("/").get(booksController.getBooks);
+Router.route("/").get(protect, booksController.getBooks);
 Router.route("/search").get(booksController.searchBook); // Fixed typo: serach -> search
 Router.route("/filter").get(booksController.filterBook);
 
