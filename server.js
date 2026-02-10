@@ -26,6 +26,13 @@ mongoose.connect(MONGODB_URI)
 
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`app running on port ${port} ......... `);
-});
+
+// Only run the server if we are NOT on Vercel (Local Development)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`App running on port ${port}...`);
+  });
+}
+
+// Export the Express API for Vercel
+export default app;

@@ -10,6 +10,8 @@ import AppError from "./utils/appError.js";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import hpp from "hpp";
+import compression from "compression";
+
 
 
 
@@ -47,6 +49,8 @@ app.use(hpp({
   ]
 }));
 
+
+app.use(compression());
 
 
 // Routes

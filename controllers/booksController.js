@@ -376,7 +376,7 @@ const exportBooks = async (req, res) => {
     return res.status(200).send(csvContent);
 
   } catch (err) {
-    console.error("Export Error:", err);
+  
     return res.status(500).json({ status: "error", message: "Export failed" });
   }
 };
@@ -443,7 +443,7 @@ const exportHistory = async (req, res) => {
     res.status(200).send(csvContent);
 
   } catch (error) {
-    console.error("Export Error:", error);
+    
     res.status(500).json({
       status: "error",
       message: "Failed to export history",
