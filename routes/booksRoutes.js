@@ -43,6 +43,4 @@ Router.route("/:id")
 Router.post( "/:id/return",protect, booksController.returnBook );
 
 
-Router.post( "/:id/borrow",protect,booksController.returnBook);
-
 export default Router;
