@@ -33,7 +33,11 @@ const bookSchema = new mongoose.Schema({
     min: [0, 'Stock cannot be negative']
   }
 }, {
-  timestamps: true // Adds createdAt and updatedAt automatically
+  
+  timestamps: true,
+  toJSON: { virtuals: true },  // <--- ADD THIS
+  toObject: { virtuals: true } // <--- ADD THIS
+
 });
 
 // Index for faster searching by title or author
@@ -41,6 +45,10 @@ bookSchema.index({ title: 'text', author: 'text' });
 
 const Book = mongoose.model('Book', bookSchema);
 
-
+bookSchema.virtual('borrowHistory', {
+  ref: 'Borrow',
+  localField: '_id',
+  foreignField: 'bookId'
+});
 
 export default Book;

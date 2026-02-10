@@ -1,12 +1,17 @@
 import Book from "../models/booksModel.js";
 import Borrow from "../models/borrowModel.js";
 import User from "../models/usersModel.js";
+import AppError from "../utils/appError.js"; // Import your error class
 
 
-const getUserHistory = async (req, res) => {
+
+const getUserHistory = async (req, res,next) => {
   try {
     const userId = req.params.id; // Expecting a Mongo ObjectId string
 
+    if (req.user.role !== 'admin' && req.user.id !== userId) {
+      return next(new AppError("You do not have permission to view this user's history.", 403));
+    }
     // 1. Find all borrow records & automatically fill in the Book details
     // .populate('bookId') replaces the ID with the actual Book object
     const borrows = await Borrow.find({ userId: userId })
@@ -39,7 +44,7 @@ const getUserHistory = async (req, res) => {
         // Compare Dates directly
         overdue: b.returned 
           ? b.returnDate > b.dueDate // If returned: Was it late?
-          : new Date() > b.dueDate   // If active: Is it late right now?
+          : Date.now() > new Date(b.dueDate).getTime()   // If active: Is it late right now?
       };
     });
 
@@ -61,6 +66,7 @@ const getBookHistory = async (req, res) => {
   try {
     const bookId = req.params.id;
 
+    
     // 1. Find the Book first to ensure it exists
     const book = await Book.findById(bookId);
 
@@ -104,7 +110,7 @@ const getBookHistory = async (req, res) => {
         // Overdue logic using direct Date comparison
         overdue: b.returned 
           ? b.returnDate > b.dueDate 
-          : new Date() > b.dueDate
+          : Date.now() > new Date(b.dueDate).getTime()
       };
     });
 

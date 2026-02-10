@@ -69,10 +69,13 @@ app.all('/*splat', (req, res, next) => {
 
 app.use((err, req, res, next) => {
   
-  res.status(err.status || 500).json({  
-    status: err.status || "error",
-    message: err.message || "Internal Server Error"
-  });
+// ✅ CORRECT: 'err.statusCode' is the number 404
+const statusCode = err.statusCode || 500; // Fallback to 500 if undefined
+
+res.status(statusCode).json({
+  status: err.status, // It's okay to send the string here in the JSON body
+  message: err.message
+});
 }
 );
 

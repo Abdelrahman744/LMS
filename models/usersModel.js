@@ -44,9 +44,14 @@ const userSchema = new mongoose.Schema({
     default: true,
     select: false 
 
-  }
-  
-});
+  },
+},
+{
+  toJSON: { virtuals: true },  // <--- ADD THIS so virtuals show up in JSON
+  toObject: { virtuals: true } // <--- ADD THIS
+}
+
+);
 
 userSchema.pre('save', async function (next){
   if (!this.isModified('password')) return next(); 
@@ -58,6 +63,12 @@ userSchema.pre('save', async function (next){
   } catch (err) {
     next(err);
   }
+});
+
+userSchema.virtual('borrowHistory', {
+  ref: 'Borrow',      // The model to look for
+  localField: '_id',  // Find Borrow records where...
+  foreignField: 'userId' // ...the 'userId' matches my '_id'
 });
 
 userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {

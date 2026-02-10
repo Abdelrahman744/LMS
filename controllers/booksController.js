@@ -3,7 +3,7 @@
 import Borrow from "../models/borrowModel.js";
 import User from "../models/usersModel.js";
 import Book from "../models/booksModel.js";
-
+import AppError from "../utils/appError.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
@@ -193,72 +193,65 @@ const deleteBook = async (req, res) => {
 
 // Done 
 
-const returnBook = async (req, res) => {
+
+
+const returnBook = async (req, res, next) => {
   try {
     const bookId = req.params.id; 
 
     // 1. Find the Book
     const book = await Book.findById(bookId);
-
     if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+      return next(new AppError("Book not found", 404));
     }
 
-    // 2. Check if already returned
-    if (book.available) {
-      return res.status(400).json({ message: "Book is already marked as available" });
-    }
-
-    // 3. Update the Book Availability
-    // We ONLY need to update 'available'. 
-    // The history is now safely stored in the 'Borrow' collection.
-    book.available = true;
-    await book.save();
-
-    // 4. Update the active Borrow Record
+    // 2. Find the Active Borrow Record for THIS Book
+    // We need to know WHO borrowed it to check permissions
     const borrowRecord = await Borrow.findOne({ 
         bookId: book._id, 
-        returned: false // Find the one that is currently active
+        returned: false 
     });
 
-    let returnedOnDate = null;
-
-    if (borrowRecord) {
-      returnedOnDate = new Date(); // Use a real Date object
-      
-      borrowRecord.returned = true;
-      borrowRecord.returnDate = returnedOnDate;
-      
-      await borrowRecord.save();
+    if (!borrowRecord) {
+       return next(new AppError("This book is not currently borrowed.", 400));
     }
 
-    // 5. Send Response
+    // 3. SECURITY CHECK: Who is trying to return it?
+    // - Admins can return ANY book.
+    // - Members can ONLY return books they borrowed.
+    if (req.user.role !== 'admin' && borrowRecord.userId.toString() !== req.user.id) {
+        return next(new AppError("You do not have permission to return this book.", 403));
+    }
+
+    // 4. Update the Borrow Record (Mark as returned)
+    borrowRecord.returned = true;
+    borrowRecord.returnDate = Date.now();
+    await borrowRecord.save();
+
+    // 5. Update the Book (Handle Stock Logic!)
+    book.stock += 1;   // <--- CRITICAL FIX: Restore the stock count
+    book.available = true; // Make sure it's marked available
+    await book.save();
+
+    // 6. Send Response
     res.status(200).json({
       status: "success",
-      message: "Book returned! Thank you",
+      message: "Book returned successfully!",
       data: {
         book: { 
             id: book._id, 
             title: book.title, 
-            available: true 
+            available: book.available,
+            stock: book.stock // Return new stock so frontend can update
         },
-        returnedOn: returnedOnDate
+        returnedOn: borrowRecord.returnDate
       }
     });
 
   } catch (error) {
-    // Handle invalid ID format
-    if (error.name === 'CastError') {
-       return res.status(400).json({ status: "fail", message: "Invalid Book ID format" });
-    }
-    
-    res.status(500).json({
-      status: "error",
-      message: error.message
-    });
+    next(error);
   }
 };
-
 
 // Done
 

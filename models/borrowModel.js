@@ -26,6 +26,8 @@ const borrowSchema = new mongoose.Schema({
     type: Date,
     default: null
   }
+
+
 });
 
 // Prevent a user from borrowing the exact same book twice at the same time
