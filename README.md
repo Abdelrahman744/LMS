@@ -1,95 +1,104 @@
-# Library Management System – Full Stack Application
+# 📚 Library Management System (LMS) API
 
-A complete **Library Management System** featuring a **Node.js + Express** backend (using JSON files for storage) and a **React + Tailwind CSS** frontend.
+> **Live Demo:** [https://lms-two-alpha.vercel.app/api/books](https://lms-two-alpha.vercel.app/api/books)  
+> **API Documentation:** [View on Postman](https://documenter.getpostman.com/view/49732434/2sBXcAJ32R)
 
-Live: `http://localhost:3000` (for API) and `http://localhost:5173` (for Frontend)  
-Author: Abdelrahman Ashraf  
-Tech Stack: Node.js, Express.js, React, Tailwind CSS
-
----
-
-### Features
-
-| Feature                                | Status |
-| :------------------------------------- | :----- |
-| User Registration & Login              | Done   |
-| Role-based Access (Admin / Member)     | Done   |
-| Add / Edit / Delete Books (Admin)      | Done   |
-| **Admin can update Book Availability** | Done   |
-| Borrow & Return Books                  | Done   |
-| Max 5 active borrows per user          | Done   |
-| Search & Filter Books                  | Done   |
-| User & Book Borrowing History          | Done   |
-| Export Books & History as CSV          | Done   |
-| Full input validation & error handling | Done   |
-| **Modern React Frontend Interface**    | Done   |
+A secure, RESTful API built with **Node.js, Express, and MongoDB** to manage library operations. It handles user authentication, book inventory, borrowing systems, and user history tracking.
 
 ---
 
-### API Endpoints
+## 🚀 Features
 
-The API is served on `http://localhost:3000/api`.
-
-#### Public Routes
-
-| Method | Endpoint                         | Description            |
-| :----- | :------------------------------- | :--------------------- |
-| POST   | `/api/users/register`            | Register new user      |
-| POST   | `/api/users/login`               | Login (simple check)   |
-| GET    | `/api/books`                     | Get all books          |
-| GET    | `/api/books/search?q=keyword`    | Search by title/author |
-| GET    | `/api/books/filter?category=...` | Filter by category     |
-| GET    | `/api/books/:id`                 | Get single book        |
-
-#### Authenticated Routes (Requires **User ID in Request Body**)
-
-These endpoints require the user to send their unique `id` in the JSON request body for authentication via the `restrictTo` middleware.
-
-| Method | Endpoint                     | Body Example        | Description                            |
-| :----- | :--------------------------- | :------------------ | :------------------------------------- |
-| POST   | `/api/borrow/:bookId`        | `{ "id": 2 }`       | Borrow a book                          |
-| POST   | `/api/books/:bookId/return`  | `{ "id": 2 }`       | Return a book                          |
-| GET    | `/api/history/users/:userId` | **N/A** (ID in URL) | View own or any user's history (admin) |
-
-#### Admin Only Routes
-
-These routes are restricted to users with the `"admin"` role, verified by their `id` in the request body (for POST/PATCH/DELETE) or query (for GET exports).
-
-| Method | Endpoint                     | Body Example                                                                | Description                      |
-| :----- | :--------------------------- | :-------------------------------------------------------------------------- | :------------------------------- |
-| POST   | `/api/books`                 | `{ "id":1, "title":"...", "author":"...", "category":"...", "isbn":"..." }` | Add book                         |
-| PATCH  | `/api/books/:id`             | `{ "id":1, "title":"New Title", "available": false }`                       | Edit book details & availability |
-| DELETE | `/api/books/:id`             | `{ "id": 1 }`                                                               | Delete book                      |
-| GET    | `/api/history/books/:bookId` | **N/A** (ID in URL)                                                         | View book borrow history         |
-
-#### Admin Export Routes (Requires **User ID in Query Parameter**)
-
-These endpoints require the admin to pass their ID as a query parameter for authentication.
-
-| Method | Endpoint                    | Query Example | Description          |
-| :----- | :-------------------------- | :------------ | :------------------- |
-| GET    | `/api/books/export/books`   | `?userId=1`   | Download books.csv   |
-| GET    | `/api/books/export/history` | `?userId=1`   | Download history.csv |
+* **🔐 Authentication & Security:**
+    * JWT-based Sign Up, Login, and Password Reset.
+    * Protected routes (Middleware) to prevent unauthorized access.
+    * Password encryption using bcrypt.
+* **📖 Book Management:**
+    * CRUD operations for books (Create, Read, Update, Delete).
+    * Search functionality.
+* **🔄 Borrowing System:**
+    * Borrow books with due dates.
+    * Auto-check for stock availability.
+    * Return books and update inventory automatically.
+* **📜 History Tracking:**
+    * View borrowing history for specific users or books.
+* **☁️ Deployment:**
+    * Deployed on **Vercel** (Serverless).
+    * Database hosted on **MongoDB Atlas**.
 
 ---
 
-### How to Run (Full-Stack Setup)
+## 🛠️ Tech Stack
 
-This project requires two separate terminals: one for the backend API and one for the React frontend.
+* **Backend:** Node.js, Express.js
+* **Database:** MongoDB, Mongoose
+* **Security:** JWT, Bcrypt, Helmet, Express-Rate-Limit
+* **Deployment:** Vercel
 
-#### 1. Backend Setup
+---
 
-The API is located in the root of the cloned repository.
+## 🔌 API Endpoints
 
-```bash
-# Clone the repository (if not already done)
-# git clone [https://github.com/abd66lrahman/lms-project.git](https://github.com/abd66lrahman/lms-project.git)
-cd lms-project
+### 👤 Users (Auth)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/users/register` | Create a new account |
+| `POST` | `/api/users/login` | Login and get Token |
+| `POST` | `/api/users/forgotPassword` | Request password reset email |
+| `PATCH` | `/api/users/resetPassword/:token` | Reset password |
+| `PATCH` | `/api/users/updateMe` | Update profile details (Protected) |
 
-# Install dependencies for the backend
-npm install
+### 📚 Books
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/books` | Get all books |
+| `GET` | `/api/books/:id` | Get single book details |
+| `POST` | `/api/books` | Add a new book (Admin) |
+| `PATCH` | `/api/books/:id` | Update book details |
+| `DELETE` | `/api/books/:id` | Delete a book |
 
-# Start the API server on port 3000
-npm run dev
-# Server running on port 3000 .........
-```
+### 🔄 Borrowing & History
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/borrow/:id` | Borrow a book (Requires Due Date) |
+| `POST` | `/api/books/:id/return` | Return a borrowed book |
+| `GET` | `/api/history/users/:id` | View a user's borrowing history |
+| `GET` | `/api/history/books/:id` | View a book's borrowing history |
+
+---
+
+## ⚙️ Local Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/Abdelrahman744/LMS.git](https://github.com/Abdelrahman744/LMS.git)
+    cd lms
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Set up Environment Variables:**
+    Create a `.env` file in the root directory and add:
+    ```env
+    NODE_ENV=development
+    PORT=3000
+    MONGODB_URI=your_mongodb_connection_string
+    JWT_SECRET=your_super_secret_key
+    JWT_EXPIRES_IN=90d
+    ```
+
+4.  **Run the server:**
+    ```bash
+    npm start
+    ```
+
+---
+
+## 🤝 Contributing
+Contributions, issues, and feature requests are welcome!
+
+## 📝 License
+This project is open source.
