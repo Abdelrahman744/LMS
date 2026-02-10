@@ -73,11 +73,11 @@ app.all('/*splat', (req, res, next) => {
 
 app.use((err, req, res, next) => {
   
-// ✅ CORRECT: 'err.statusCode' is the number 404
-const statusCode = err.statusCode || 500; // Fallback to 500 if undefined
+
+const statusCode = err.statusCode || 500; 
 
 res.status(statusCode).json({
-  status: err.status, // It's okay to send the string here in the JSON body
+  status: err.status, 
   message: err.message
 });
 }

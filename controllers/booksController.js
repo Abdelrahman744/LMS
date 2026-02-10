@@ -5,8 +5,6 @@ import User from "../models/usersModel.js";
 import Book from "../models/booksModel.js";
 import AppError from "../utils/appError.js";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
-
 const __filename = fileURLToPath(import.meta.url);
 
 
@@ -17,7 +15,6 @@ const __filename = fileURLToPath(import.meta.url);
 const getBooks = async (req, res) => {
   try {
     // 1. Fetch all books
-    // .select('-__v') removes the internal Mongoose version key
     const books = await Book.find().select('-__v');
 
     // 2. Send Response
@@ -29,7 +26,6 @@ const getBooks = async (req, res) => {
 
   } catch (error) {
     // 3. Handle Server Errors
-    // Use 500 (Server Error) because if this fails, the DB is down.
     res.status(500).json({
       status: "error",
       message: "Failed to retrieve books from database",
@@ -40,10 +36,9 @@ const getBooks = async (req, res) => {
 // Done
 const getBook = async (req, res) => {
   try {
-    // 1. Find the book
+    // Find the book
     const book = await Book.findById(req.params.id).select('-__v');
 
-    // 2. CRITICAL: Check if book is null (ID format was valid, but no record found)
     if (!book) {
       return res.status(404).json({
         status: "fail",
@@ -51,15 +46,12 @@ const getBook = async (req, res) => {
       });
     }
 
-    // 3. Send Success Response
     res.status(200).json({
       status: "success",
       data: { book },
     });
 
   } catch (error) {
-    // 4. Handle Invalid IDs or Server Errors
-    // If the ID is the wrong format (e.g. "123" instead of ObjectId), Mongoose throws a CastError
     if (error.name === 'CastError') {
        return res.status(400).json({
          status: "fail",
@@ -77,9 +69,7 @@ const getBook = async (req, res) => {
 // Done
 const addBook = async (req, res) => {
   try {
-    // 1. Create the book
-    // You can pass req.body directly because the Schema acts as a filter.
-    // However, destructuring is safer if you want to strictly control inputs.
+    //  Create the book
     const newBook = await Book.create(req.body);
 
     res.status(201).json({
@@ -88,18 +78,17 @@ const addBook = async (req, res) => {
     });
 
   } catch (error) {
-    // 2. Handle Duplicate ISBN Error (Mongoose Error Code 11000)
     if (error.code === 11000) {
-      return res.status(409).json({ // 409 Conflict
+      return res.status(409).json({ 
         status: "fail",
         message: "A book with this ISBN already exists",
       });
     }
 
-    // 3. Handle Validation Errors (Missing Title, too short, etc.)
+    // Handle Validation Errors 
     res.status(400).json({
       status: "fail",
-      message: error.message, // Send the specific validation error to the user
+      message: error.message, 
     });
   }
 };
@@ -109,10 +98,11 @@ const editBook = async (req, res) => {
     const updatedBook = await Book.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true } // valid for new Schema
+      { new: true, runValidators: true } 
     );
 
     // Check if ID was valid format but document didn't exist
+
     if (!updatedBook) {
       return res.status(404).json({ 
         status: "fail", 
@@ -126,7 +116,7 @@ const editBook = async (req, res) => {
     });
 
   } catch (error) {
-    // 1. Handle Duplicate ISBN (e.g., changing ISBN to one that exists)
+    //  Handle Duplicate ISBN 
     if (error.code === 11000) {
         return res.status(409).json({
             status: 'fail',
@@ -134,7 +124,7 @@ const editBook = async (req, res) => {
         });
     }
 
-    // 2. Handle Invalid ID format (e.g., "123" instead of ObjectId)
+    //  Handle Invalid ID format 
     if (error.name === 'CastError') {
         return res.status(400).json({
             status: 'fail',
@@ -142,7 +132,7 @@ const editBook = async (req, res) => {
         });
     }
 
-    // 3. Handle Validation Errors (e.g. invalid stock number)
+    // Handle Validation Errors 
     res.status(400).json({
       status: "fail",
       message: error.message, 
@@ -167,7 +157,6 @@ const deleteBook = async (req, res) => {
     }
 
     // 3. Delete all borrow records for this book
-    // This prevents "orphan" data (Borrow records pointing to a book that doesn't exist)
     await Borrow.deleteMany({ bookId: bookId });
 
     res.status(200).json({
@@ -206,7 +195,6 @@ const returnBook = async (req, res, next) => {
     }
 
     // 2. Find the Active Borrow Record for THIS Book
-    // We need to know WHO borrowed it to check permissions
     const borrowRecord = await Borrow.findOne({ 
         bookId: book._id, 
         returned: false 
@@ -217,8 +205,7 @@ const returnBook = async (req, res, next) => {
     }
 
     // 3. SECURITY CHECK: Who is trying to return it?
-    // - Admins can return ANY book.
-    // - Members can ONLY return books they borrowed.
+  
     if (req.user.role !== 'admin' && borrowRecord.userId.toString() !== req.user.id) {
         return next(new AppError("You do not have permission to return this book.", 403));
     }
@@ -228,9 +215,9 @@ const returnBook = async (req, res, next) => {
     borrowRecord.returnDate = Date.now();
     await borrowRecord.save();
 
-    // 5. Update the Book (Handle Stock Logic!)
-    book.stock += 1;   // <--- CRITICAL FIX: Restore the stock count
-    book.available = true; // Make sure it's marked available
+    // 5. Update the Book
+    book.stock += 1;   
+    book.available = true; 
     await book.save();
 
     // 6. Send Response
@@ -242,7 +229,7 @@ const returnBook = async (req, res, next) => {
             id: book._id, 
             title: book.title, 
             available: book.available,
-            stock: book.stock // Return new stock so frontend can update
+            stock: book.stock 
         },
         returnedOn: borrowRecord.returnDate
       }
@@ -259,27 +246,27 @@ const searchBook = async (req, res) => {
   try {
     const q = req.query.q?.trim();
 
-    // 1. Validate Input
+    // Validate Input
     if (!q) {
       return res.status(400).json({ message: "Query 'q' is required" });
     }
 
-    // 2. ESCAPE special regex characters to prevent crashes
-    // If user searches for "(Harry", this turns it into "\(Harry" so it's treated as text.
+    
+   
     const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // 3. Create Regex
+    //  Create Regex
     const searchRegex = new RegExp(safeQuery, 'i');
 
-    // 4. Search with $or (Title OR Author)
+    // Search with $or (Title OR Author)
     const results = await Book.find({
       $or: [
         { title: searchRegex },
         { author: searchRegex },
-        { category: searchRegex }, // Added category for better UX
-        { isbn: searchRegex }      // Added ISBN for exact finding
+        { category: searchRegex }, 
+        { isbn: searchRegex }      
       ]
-    }).select('-__v'); // Clean output
+    }).select('-__v'); 
 
     res.status(200).json({
       status: "success",
@@ -297,18 +284,17 @@ const filterBook = async (req, res) => {
   try {
     const category = req.query.category?.trim();
     
-    // 1. Validate Input
+    //  Validate Input
     if (!category) {
       return res.status(400).json({ message: "Query 'category' is required" });
     }
 
-    // 2. Escape special characters (Fixes crash on "Sci-Fi" or "C++")
+    
     const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
      
 
   
-    // 3. Find Books
-    // matches strictly (^...$) but ignores case ('i')
+    //  Find Books
     const results = await Book.find({
       category: new RegExp(`^${safeCategory}$`, 'i') 
     }).select('-__v');
@@ -316,7 +302,7 @@ const filterBook = async (req, res) => {
     res.status(200).json({
       status: "success",
       results: results.length,
-      data: { books: results }, // Consistent formatting
+      data: { books: results }, 
     });
 
   } catch (error) {
@@ -328,8 +314,8 @@ const exportBooks = async (req, res) => {
   try {
     const userId = req.query.userId; 
 
-    // 1. Check if user exists (using Mongo ID)
-    // We check valid format to prevent CastErrors if a bad ID is sent
+    // 1. Check if user exists 
+    
     if (!userId || userId.length !== 24) {
          return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
     }
@@ -348,10 +334,10 @@ const exportBooks = async (req, res) => {
     const books = await Book.find().select('-__v').lean(); 
 
     // 3. Define Helper for CSV Safety
-    // This wraps text in quotes so commas inside titles don't break the file
+
     const escapeCsv = (text) => {
         if (!text) return "";
-        return `"${text.toString().replace(/"/g, '""')}"`; // Escape existing quotes
+        return `"${text.toString().replace(/"/g, '""')}"`; 
     };
 
     // 4. Generate CSV Header and Rows
@@ -372,7 +358,7 @@ const exportBooks = async (req, res) => {
 
     // 5. Send Response
     res.header("Content-Type", "text/csv");
-    res.attachment("books_export.csv"); // This prompts the browser download
+    res.attachment("books_export.csv");
     return res.status(200).send(csvContent);
 
   } catch (err) {
@@ -385,7 +371,7 @@ const exportHistory = async (req, res) => {
   try {
     const userId = req.query.userId; 
 
-    // 1. Validation (Must be a valid MongoDB ID string)
+    // 1. Validation 
     if (!userId || userId.length !== 24) {
       return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
     }
@@ -401,30 +387,30 @@ const exportHistory = async (req, res) => {
     }
 
     // 3. Fetch History AND Populate Names/Titles
-    // This replaces the ID codes with the actual objects from the other tables
+  
     const borrows = await Borrow.find()
-      .populate('userId', 'name email')  // Get User Name & Email
-      .populate('bookId', 'title')       // Get Book Title
+      .populate('userId', 'name email')  
+      .populate('bookId', 'title')      
       .lean(); 
 
-    // 4. Helper for Date Formatting (YYYY-MM-DD)
+    // 4. Helper for Date Formatting 
     const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : "";
 
     // 5. Generate Readable CSV
     const csvRows = borrows.map(b => {
-      // Handle cases where User or Book might have been deleted
+      
       const userName = b.userId ? b.userId.name : "Deleted User";
       const userEmail = b.userId ? b.userId.email : "N/A";
       const bookTitle = b.bookId ? b.bookId.title : "Deleted Book";
       
-      // Escape commas in titles/names to prevent CSV errors
+    
       const safeTitle = `"${bookTitle.replace(/"/g, '""')}"`;
       const safeName = `"${userName.replace(/"/g, '""')}"`;
 
       return [
         b._id,
-        safeTitle,     // Actual Book Title
-        safeName,      // Actual User Name
+        safeTitle,     
+        safeName,      
         userEmail,
         formatDate(b.borrowDate),
         formatDate(b.dueDate),

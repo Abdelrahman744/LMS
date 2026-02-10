@@ -1,22 +1,22 @@
 import Book from "../models/booksModel.js";
 import Borrow from "../models/borrowModel.js";
 import User from "../models/usersModel.js";
-import AppError from "../utils/appError.js"; // Import your error class
+import AppError from "../utils/appError.js"; 
 
 
 
 const getUserHistory = async (req, res,next) => {
   try {
-    const userId = req.params.id; // Expecting a Mongo ObjectId string
+    const userId = req.params.id;
 
     if (req.user.role !== 'admin' && req.user.id !== userId) {
       return next(new AppError("You do not have permission to view this user's history.", 403));
     }
     // 1. Find all borrow records & automatically fill in the Book details
-    // .populate('bookId') replaces the ID with the actual Book object
+    
     const borrows = await Borrow.find({ userId: userId })
-      .populate('bookId', 'title author') // Only get title and author (optional optimization)
-      .lean(); // Converts to plain JS object
+      .populate('bookId', 'title author') 
+      .lean(); 
 
     if (!borrows.length) {
       return res.status(200).json({
@@ -28,7 +28,7 @@ const getUserHistory = async (req, res,next) => {
 
     // 2. Format the data for the response
     const history = borrows.map((b) => {
-      // Handle case where book might have been deleted from database
+      
       const book = b.bookId || null; 
 
       return {
@@ -41,10 +41,10 @@ const getUserHistory = async (req, res,next) => {
         returned: b.returned,
         returnedOn: b.returnDate,
         
-        // Compare Dates directly
+        
         overdue: b.returned 
-          ? b.returnDate > b.dueDate // If returned: Was it late?
-          : Date.now() > new Date(b.dueDate).getTime()   // If active: Is it late right now?
+          ? b.returnDate > b.dueDate 
+          : Date.now() > new Date(b.dueDate).getTime()   
       };
     });
 
@@ -78,7 +78,7 @@ const getBookHistory = async (req, res) => {
     }
 
     // 2. Find borrowing history & populate User details
-    // .populate('userId', 'name email') -> Go to User table, get name & email for this ID
+  
     const borrows = await Borrow.find({ bookId: bookId })
       .populate('userId', 'name email') 
       .lean();
@@ -92,7 +92,7 @@ const getBookHistory = async (req, res) => {
 
     // 3. Transform the data
     const history = borrows.map((b) => {
-      // Handle case where user might have been deleted
+    
       const user = b.userId || null; 
 
       return {
@@ -107,7 +107,7 @@ const getBookHistory = async (req, res) => {
         returned: b.returned,
         returnedOn: b.returnDate || null,
         
-        // Overdue logic using direct Date comparison
+      
         overdue: b.returned 
           ? b.returnDate > b.dueDate 
           : Date.now() > new Date(b.dueDate).getTime()

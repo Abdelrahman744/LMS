@@ -13,7 +13,7 @@ const bookSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: [true, 'A book must have a category'], // e.g., "Fiction", "Sci-Fi"
+    required: [true, 'A book must have a category'], 
     trim: true
   },
   isbn: {
@@ -26,7 +26,7 @@ const bookSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // Optional: If you want to track physical stock count
+ 
   stock: {
     type: Number,
     default: 1,
@@ -35,12 +35,12 @@ const bookSchema = new mongoose.Schema({
 }, {
   
   timestamps: true,
-  toJSON: { virtuals: true },  // <--- ADD THIS
-  toObject: { virtuals: true } // <--- ADD THIS
+  toJSON: { virtuals: true }, 
+  toObject: { virtuals: true } 
 
 });
 
-// Index for faster searching by title or author
+
 bookSchema.index({ title: 'text', author: 'text' });
 
 const Book = mongoose.model('Book', bookSchema);

@@ -24,7 +24,7 @@ const createSendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
   const cookieOptions = {
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-    httpOnly: true, // Cookie cannot be accessed by client-side scripts
+    httpOnly: true, 
     secure: process.env.NODE_ENV === 'production' // Only send cookie over HTTPS in production
   };
   res.cookie('jwt', token, cookieOptions);
@@ -92,8 +92,8 @@ const signUp = async (req, res) => {
     const newUser = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      password: password, // ⚠️ See Security Note below
-      role: "member",     // Default role
+      password: password, 
+      role: "member",    
     });
 
 
@@ -135,15 +135,14 @@ const signIn = async (req, res) => {
     }).select('+password');
 
     // 3. Verify User AND Password
-    // FIX A: Check if user exists BEFORE checking password to avoid crashes
+
     if (!user || !(await user.correctPassword(password, user.password))) {
       return res.status(401).json({
         status: "fail",
         message: "Incorrect email or password"
       });
-    } // FIX B: Added closing brace here
+    } 
 
-    // FIX C: Generate Token (Assuming you have a signToken function)
      
  
     createSendToken(user, 200, res);
@@ -364,7 +363,7 @@ const deleteMe = async (req, res, next) => {
       data: null
     });
   } catch (err) {
-    next(err); // Let your global error handler catch it
+    next(err); 
   }
 };
 

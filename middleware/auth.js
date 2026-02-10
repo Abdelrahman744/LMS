@@ -1,11 +1,13 @@
 import {promisify} from 'util';
-
-
-
 import jwt from 'jsonwebtoken';
+import User from '../models/usersModel.js'; 
 
 
-import User from '../models/usersModel.js'; // Adjust path
+
+
+
+
+
 
  const protect = async (req, res, next) => {
   try {
@@ -46,8 +48,7 @@ import User from '../models/usersModel.js'; // Adjust path
   }
 };
 
-// 2. RESTRICT TO: The "VIP List"
-// Checks if the user has the right role
+
 
  const restrictTo = (...allowedRoles) => {
  

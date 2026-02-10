@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
+
 const borrowSchema = new mongoose.Schema({
   bookId: {
-    type: mongoose.Schema.Types.ObjectId, // Links to a real Book document
+    type: mongoose.Schema.Types.ObjectId, 
     ref: 'Book',
     required: [true, 'Borrow record must belong to a book']
   },
   userId: {
-    type: mongoose.Schema.Types.ObjectId, // Links to a real User document
+    type: mongoose.Schema.Types.ObjectId, 
     ref: 'User',
     required: [true, 'Borrow record must belong to a user']
   },
@@ -30,8 +31,8 @@ const borrowSchema = new mongoose.Schema({
 
 });
 
-// Prevent a user from borrowing the exact same book twice at the same time
-// (Unique only if returned is false)
+
+
 borrowSchema.index({ bookId: 1, returned: 1 });
 const Borrow = mongoose.model('Borrow', borrowSchema);
 export default Borrow;

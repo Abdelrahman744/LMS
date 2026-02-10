@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Please provide an email'],
-    unique: true, // Ensures no two users have the same email
+    unique: true,
     lowercase: true,
     trim: true,
     match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid email']
@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a password'],
     minlength: [6, 'Password must be at least 6 characters'],
-    select: false // IMPORTANT: Never send password in output by default
+    select: false 
   },
   role: {
     type: String,
@@ -47,8 +47,8 @@ const userSchema = new mongoose.Schema({
   },
 },
 {
-  toJSON: { virtuals: true },  // <--- ADD THIS so virtuals show up in JSON
-  toObject: { virtuals: true } // <--- ADD THIS
+  toJSON: { virtuals: true },  
+  toObject: { virtuals: true } 
 }
 
 );
@@ -66,9 +66,9 @@ userSchema.pre('save', async function (next){
 });
 
 userSchema.virtual('borrowHistory', {
-  ref: 'Borrow',      // The model to look for
-  localField: '_id',  // Find Borrow records where...
-  foreignField: 'userId' // ...the 'userId' matches my '_id'
+  ref: 'Borrow',     
+  localField: '_id',  
+  foreignField: 'userId' 
 });
 
 userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
@@ -86,8 +86,6 @@ userSchema.pre(/^find/, function(next) {
   this.find({ activated: { $ne: false } });
   next();
 }); 
-
-
 
 
 userSchema.methods.createPasswordResetToken = function() {

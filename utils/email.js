@@ -14,7 +14,7 @@ const sendEmail = async (options) => {
         }
     });
 
-    // Add this to debug: it verifies the config is correct
+   
     await transporter.verify(); 
 
     const mailOptions = {
