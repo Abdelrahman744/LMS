@@ -1,21 +1,20 @@
 import express from "express";
 import * as booksController from "./../controllers/booksController.js";
-// You usually need 'protect' before 'restrictTo' to verify the user is logged in
 import { protect, restrictTo } from "./../middleware/auth.js"; 
 
 const Router = express.Router();
 
-// ============================================================
-// 1. STATIC ROUTES (Must come BEFORE /:id)
-// ============================================================
 
 // Public Routes
 Router.route("/").get(protect, booksController.getBooks);
-Router.route("/search").get(booksController.searchBook); // Fixed typo: serach -> search
+Router.route("/:id").get(booksController.getBook)
+Router.route("/search").get(booksController.searchBook); 
 Router.route("/filter").get(booksController.filterBook);
 
-// Export Routes (Specific paths)
-// These MUST be above /:id, or Express will think "export" is an ID
+
+
+// admin routes
+
 Router.route("/export/books").get(
   protect, 
   restrictTo("admin"), 
@@ -28,33 +27,22 @@ Router.route("/export/history").get(
   booksController.exportHistory
 );
 
-// Admin Create Route
+
 Router.post("/", protect, restrictTo("admin"), booksController.addBook);
 
-// ============================================================
-// 2. DYNAMIC ROUTES (/:id catches everything else)
-// ============================================================
 
 Router.route("/:id")
-  .get(booksController.getBook) // Public read
   .patch(protect, restrictTo("admin"), booksController.editBook)
   .delete(protect, restrictTo("admin"), booksController.deleteBook);
 
-// Borrow actions
-// Based on our previous work, this was 'returnBook'
-Router.post(
-  "/:id/return",
-  protect,
-  restrictTo("admin", "member"),
-  booksController.returnBook 
-);
 
 
-Router.post(
-  "/:id/borrow",
-  protect,
-  restrictTo("member"),
-  booksController.returnBook
-);
+  // authenticated routes 
+  
+
+Router.post( "/:id/return",protect, booksController.returnBook );
+
+
+Router.post( "/:id/borrow",protect,booksController.returnBook);
 
 export default Router;
