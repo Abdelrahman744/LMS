@@ -1,15 +1,11 @@
 import express from "express";
 import morgan from "morgan";
-import { RedisStore } from "rate-limit-redis";
-import redisClient from "./utils/redisClient.js";
 import bookRouter from "./routes/booksRoutes.js";
 import usersRouter from "./routes/usersRoutes.js";
 import borrowRouter from "./routes/borrowRoutes.js";
 import historyRouter from "./routes/historyRoutes.js";
 
-
 import AppError from "./utils/appError.js";
-import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
@@ -32,18 +28,7 @@ app.use(helmet());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// Limit requests from the same IP
 
-// app.use("/api", rateLimit({
-//   max: 100,
-//   windowMs: 60 * 60 * 1000,
-//   message: "Too many requests from this IP, please try again in an hour!",
-//   store: new RedisStore({
-//     client: redisClient,
-//     prefix: "rate-limit:",
-//     sendCommand: (...args) => redisClient.sendCommand(args)
-//   })
-// }));
 
 // prevent parameter pollution
 

@@ -1,10 +1,9 @@
-import redisClient from "../utils/redisClient.js";
+import { getRedisClient } from "../utils/redisClient.js";
 import Borrow from "../models/borrowModel.js";
 import User from "../models/usersModel.js";
 import Book from "../models/booksModel.js";
 import AppError from "../utils/appError.js";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
+
 
 
 
@@ -12,23 +11,24 @@ const __filename = fileURLToPath(import.meta.url);
 
 const getBooks = async (req, res) => {
   try {
+    const redis = await getRedisClient();
 
-    const cachedBooks = await redisClient.get("allBooks");
-
-
-    if (cachedBooks) {
-      return res.status(200).json({
-        status: "success",
-        results: JSON.parse(cachedBooks).length,
-        data: { books: JSON.parse(cachedBooks) },
-      });
+    if (redis) {
+      const cachedBooks = await redis.get("allBooks");
+      if (cachedBooks) {
+        return res.status(200).json({
+          status: "success",
+          results: JSON.parse(cachedBooks).length,
+          data: { books: JSON.parse(cachedBooks) },
+        });
+      }
     }
-
 
     const books = await Book.find().select('-__v');
 
-
-    await redisClient.setEx("allBooks", 60 * 60, JSON.stringify(books));
+    if (redis) {
+      await redis.setEx("allBooks", 60 * 60, JSON.stringify(books)).catch(() => {});
+    }
 
     res.status(200).json({
       status: "success",
@@ -79,7 +79,8 @@ const addBook = async (req, res) => {
   try {
     const newBook = await Book.create(req.body);
 
-    await redisClient.del("allBooks");
+    const redis = await getRedisClient();
+    if (redis) await redis.del("allBooks").catch(() => {});
     res.status(201).json({
       status: "success",
       data: { book: newBook },
@@ -114,7 +115,8 @@ const editBook = async (req, res) => {
       });
     }
 
-    await redisClient.del("allBooks");
+    const redis = await getRedisClient();
+    if (redis) await redis.del("allBooks").catch(() => {});
     res.status(200).json({
       status: "success",
       data: { book: updatedBook },
@@ -157,7 +159,8 @@ const deleteBook = async (req, res) => {
 
     await Borrow.deleteMany({ bookId: bookId });
 
-    await redisClient.del("allBooks");
+    const redis = await getRedisClient();
+    if (redis) await redis.del("allBooks").catch(() => {});
     res.status(200).json({
       status: "success",
       message: "Book and its history deleted successfully",
