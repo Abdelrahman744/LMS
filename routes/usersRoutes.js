@@ -23,7 +23,7 @@ Router.route("/activateMe").patch(protect, usersController.activateMe);
 
 // admin only
 
-Router.route("/").get(protect,restrictTo,usersController.getAllUsers);
+Router.route("/").get(protect, restrictTo("admin"), usersController.getAllUsers);
 
 export default Router;
  

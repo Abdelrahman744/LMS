@@ -15,6 +15,6 @@ Router.get("/users/:id", protect, getUserHistory);
 
 // admin only routes 
 
-Router.get("/books/:id", protect, restrictTo, getBookHistory);
+Router.get("/books/:id", protect, restrictTo("admin"), getBookHistory);
 
 export default Router;
