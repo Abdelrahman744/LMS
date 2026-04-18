@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import dns from "dns";
 import { app } from "./app.js";
 
+
 dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -12,7 +13,8 @@ if (!MONGODB_URI) {
 }
 
 
-dns.setServers(['8.8.8.8','1.1.1.1']);
+
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
@@ -21,7 +23,7 @@ mongoose.connect(MONGODB_URI)
   .catch((err) => {
     console.error("Error connecting to MongoDB", err);
     process.exit(1);
-  }); 
+  });
 
 
 

@@ -1,5 +1,4 @@
-
-
+import redisClient from "../utils/redisClient.js";
 import Borrow from "../models/borrowModel.js";
 import User from "../models/usersModel.js";
 import Book from "../models/booksModel.js";
@@ -14,9 +13,18 @@ const __filename = fileURLToPath(import.meta.url);
 // Done
 const getBooks = async (req, res) => {
   try {
+    const cachedBooks = await redisClient.get("allBooks");
+    if (cachedBooks) {
+      return res.status(200).json({
+        status: "success",
+        results: JSON.parse(cachedBooks).length,
+        data: { books: JSON.parse(cachedBooks) },
+      });
+    }
     // 1. Fetch all books
     const books = await Book.find().select('-__v');
 
+    await redisClient.setEx("allBooks", 60 * 60, JSON.stringify(books));
     // 2. Send Response
     res.status(200).json({
       status: "success",
@@ -53,10 +61,10 @@ const getBook = async (req, res) => {
 
   } catch (error) {
     if (error.name === 'CastError') {
-       return res.status(400).json({
-         status: "fail",
-         message: "Invalid ID format",
-       });
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid ID format",
+      });
     }
 
     res.status(500).json({
@@ -72,6 +80,7 @@ const addBook = async (req, res) => {
     //  Create the book
     const newBook = await Book.create(req.body);
 
+    await redisClient.del("allBooks");
     res.status(201).json({
       status: "success",
       data: { book: newBook },
@@ -79,7 +88,7 @@ const addBook = async (req, res) => {
 
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         status: "fail",
         message: "A book with this ISBN already exists",
       });
@@ -88,7 +97,7 @@ const addBook = async (req, res) => {
     // Handle Validation Errors 
     res.status(400).json({
       status: "fail",
-      message: error.message, 
+      message: error.message,
     });
   }
 };
@@ -98,18 +107,19 @@ const editBook = async (req, res) => {
     const updatedBook = await Book.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true } 
+      { new: true, runValidators: true }
     );
 
     // Check if ID was valid format but document didn't exist
 
     if (!updatedBook) {
-      return res.status(404).json({ 
-        status: "fail", 
-        message: "Book not found" 
+      return res.status(404).json({
+        status: "fail",
+        message: "Book not found"
       });
     }
 
+    await redisClient.del("allBooks");
     res.status(200).json({
       status: "success",
       data: { book: updatedBook },
@@ -118,24 +128,24 @@ const editBook = async (req, res) => {
   } catch (error) {
     //  Handle Duplicate ISBN 
     if (error.code === 11000) {
-        return res.status(409).json({
-            status: 'fail',
-            message: 'A book with this ISBN already exists'
-        });
+      return res.status(409).json({
+        status: 'fail',
+        message: 'A book with this ISBN already exists'
+      });
     }
 
     //  Handle Invalid ID format 
     if (error.name === 'CastError') {
-        return res.status(400).json({
-            status: 'fail',
-            message: 'Invalid Book ID format'
-        });
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Invalid Book ID format'
+      });
     }
 
     // Handle Validation Errors 
     res.status(400).json({
       status: "fail",
-      message: error.message, 
+      message: error.message,
     });
   }
 };
@@ -159,6 +169,7 @@ const deleteBook = async (req, res) => {
     // 3. Delete all borrow records for this book
     await Borrow.deleteMany({ bookId: bookId });
 
+    await redisClient.del("allBooks");
     res.status(200).json({
       status: "success",
       message: "Book and its history deleted successfully",
@@ -167,10 +178,10 @@ const deleteBook = async (req, res) => {
   } catch (error) {
     // 4. Handle Invalid ID format
     if (error.name === 'CastError') {
-       return res.status(400).json({
-         status: "fail",
-         message: "Invalid Book ID format",
-       });
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid Book ID format",
+      });
     }
 
     res.status(500).json({
@@ -186,7 +197,7 @@ const deleteBook = async (req, res) => {
 
 const returnBook = async (req, res, next) => {
   try {
-    const bookId = req.params.id; 
+    const bookId = req.params.id;
 
     // 1. Find the Book
     const book = await Book.findById(bookId);
@@ -195,19 +206,19 @@ const returnBook = async (req, res, next) => {
     }
 
     // 2. Find the Active Borrow Record for THIS Book
-    const borrowRecord = await Borrow.findOne({ 
-        bookId: book._id, 
-        returned: false 
+    const borrowRecord = await Borrow.findOne({
+      bookId: book._id,
+      returned: false
     });
 
     if (!borrowRecord) {
-       return next(new AppError("This book is not currently borrowed.", 400));
+      return next(new AppError("This book is not currently borrowed.", 400));
     }
 
     // 3. SECURITY CHECK: Who is trying to return it?
-  
+
     if (req.user.role !== 'admin' && borrowRecord.userId.toString() !== req.user.id) {
-        return next(new AppError("You do not have permission to return this book.", 403));
+      return next(new AppError("You do not have permission to return this book.", 403));
     }
 
     // 4. Update the Borrow Record (Mark as returned)
@@ -216,8 +227,8 @@ const returnBook = async (req, res, next) => {
     await borrowRecord.save();
 
     // 5. Update the Book
-    book.stock += 1;   
-    book.available = true; 
+    book.stock += 1;
+    book.available = true;
     await book.save();
 
     // 6. Send Response
@@ -225,11 +236,11 @@ const returnBook = async (req, res, next) => {
       status: "success",
       message: "Book returned successfully!",
       data: {
-        book: { 
-            id: book._id, 
-            title: book.title, 
-            available: book.available,
-            stock: book.stock 
+        book: {
+          id: book._id,
+          title: book.title,
+          available: book.available,
+          stock: book.stock
         },
         returnedOn: borrowRecord.returnDate
       }
@@ -251,8 +262,8 @@ const searchBook = async (req, res) => {
       return res.status(400).json({ message: "Query 'q' is required" });
     }
 
-    
-   
+
+
     const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     //  Create Regex
@@ -263,10 +274,10 @@ const searchBook = async (req, res) => {
       $or: [
         { title: searchRegex },
         { author: searchRegex },
-        { category: searchRegex }, 
-        { isbn: searchRegex }      
+        { category: searchRegex },
+        { isbn: searchRegex }
       ]
-    }).select('-__v'); 
+    }).select('-__v');
 
     res.status(200).json({
       status: "success",
@@ -283,26 +294,26 @@ const searchBook = async (req, res) => {
 const filterBook = async (req, res) => {
   try {
     const category = req.query.category?.trim();
-    
+
     //  Validate Input
     if (!category) {
       return res.status(400).json({ message: "Query 'category' is required" });
     }
 
-    
-    const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-     
 
-  
+    const safeCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+
+
     //  Find Books
     const results = await Book.find({
-      category: new RegExp(`^${safeCategory}$`, 'i') 
+      category: new RegExp(`^${safeCategory}$`, 'i')
     }).select('-__v');
 
     res.status(200).json({
       status: "success",
       results: results.length,
-      data: { books: results }, 
+      data: { books: results },
     });
 
   } catch (error) {
@@ -312,12 +323,12 @@ const filterBook = async (req, res) => {
 // Done
 const exportBooks = async (req, res) => {
   try {
-    const userId = req.query.userId; 
+    const userId = req.query.userId;
 
     // 1. Check if user exists 
-    
+
     if (!userId || userId.length !== 24) {
-         return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
+      return res.status(400).json({ status: "fail", message: "Invalid Admin ID" });
     }
 
     const user = await User.findById(userId);
@@ -331,13 +342,13 @@ const exportBooks = async (req, res) => {
     }
 
     // 2. Fetch all books
-    const books = await Book.find().select('-__v').lean(); 
+    const books = await Book.find().select('-__v').lean();
 
     // 3. Define Helper for CSV Safety
 
     const escapeCsv = (text) => {
-        if (!text) return "";
-        return `"${text.toString().replace(/"/g, '""')}"`; 
+      if (!text) return "";
+      return `"${text.toString().replace(/"/g, '""')}"`;
     };
 
     // 4. Generate CSV Header and Rows
@@ -362,14 +373,14 @@ const exportBooks = async (req, res) => {
     return res.status(200).send(csvContent);
 
   } catch (err) {
-  
+
     return res.status(500).json({ status: "error", message: "Export failed" });
   }
 };
 
 const exportHistory = async (req, res) => {
   try {
-    const userId = req.query.userId; 
+    const userId = req.query.userId;
 
     // 1. Validation 
     if (!userId || userId.length !== 24) {
@@ -380,37 +391,37 @@ const exportHistory = async (req, res) => {
     const user = await User.findById(userId);
 
     if (!user || user.role !== "admin") {
-      return res.status(403).json({ 
-        status: "fail", 
-        message: "Access denied: Admins only" 
+      return res.status(403).json({
+        status: "fail",
+        message: "Access denied: Admins only"
       });
     }
 
     // 3. Fetch History AND Populate Names/Titles
-  
+
     const borrows = await Borrow.find()
-      .populate('userId', 'name email')  
-      .populate('bookId', 'title')      
-      .lean(); 
+      .populate('userId', 'name email')
+      .populate('bookId', 'title')
+      .lean();
 
     // 4. Helper for Date Formatting 
     const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : "";
 
     // 5. Generate Readable CSV
     const csvRows = borrows.map(b => {
-      
+
       const userName = b.userId ? b.userId.name : "Deleted User";
       const userEmail = b.userId ? b.userId.email : "N/A";
       const bookTitle = b.bookId ? b.bookId.title : "Deleted Book";
-      
-    
+
+
       const safeTitle = `"${bookTitle.replace(/"/g, '""')}"`;
       const safeName = `"${userName.replace(/"/g, '""')}"`;
 
       return [
         b._id,
-        safeTitle,     
-        safeName,      
+        safeTitle,
+        safeName,
         userEmail,
         formatDate(b.borrowDate),
         formatDate(b.dueDate),
@@ -429,7 +440,7 @@ const exportHistory = async (req, res) => {
     res.status(200).send(csvContent);
 
   } catch (error) {
-    
+
     res.status(500).json({
       status: "error",
       message: "Failed to export history",
