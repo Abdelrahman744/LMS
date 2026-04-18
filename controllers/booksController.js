@@ -13,7 +13,13 @@ const __filename = fileURLToPath(import.meta.url);
 // Done
 const getBooks = async (req, res) => {
   try {
+    console.log("1. Route hit! Checking if Redis is actually connected...");
+    console.log("Is Redis Ready? :", redisClient.isReady);
+
+    console.log("2. Attempting to fetch from Redis...");
     const cachedBooks = await redisClient.get("allBooks");
+
+    console.log("3. Redis fetched successfully. Was it cached? :", !!cachedBooks);
     if (cachedBooks) {
       return res.status(200).json({
         status: "success",
@@ -21,11 +27,14 @@ const getBooks = async (req, res) => {
         data: { books: JSON.parse(cachedBooks) },
       });
     }
-    // 1. Fetch all books
+
+    console.log("4. Cache miss. Attempting to fetch from MongoDB...");
     const books = await Book.find().select('-__v');
 
+    console.log("5. MongoDB fetch successful. Saving to Redis...");
     await redisClient.setEx("allBooks", 60 * 60, JSON.stringify(books));
-    // 2. Send Response
+
+    console.log("6. Sending response to user!");
     res.status(200).json({
       status: "success",
       results: books.length,
@@ -33,7 +42,7 @@ const getBooks = async (req, res) => {
     });
 
   } catch (error) {
-    // 3. Handle Server Errors
+    console.error("❌ ERROR CAUGHT:", error.message);
     res.status(500).json({
       status: "error",
       message: "Failed to retrieve books from database",

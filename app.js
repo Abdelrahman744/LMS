@@ -34,16 +34,16 @@ app.use(morgan("dev"));
 
 // Limit requests from the same IP
 
-app.use("/api", rateLimit({
-  max: 100,
-  windowMs: 60 * 60 * 1000,
-  message: "Too many requests from this IP, please try again in an hour!",
-  store: new RedisStore({
-    client: redisClient,
-    prefix: "rate-limit:",
-    sendCommand: (...args) => redisClient.sendCommand(args)
-  })
-}));
+// app.use("/api", rateLimit({
+//   max: 100,
+//   windowMs: 60 * 60 * 1000,
+//   message: "Too many requests from this IP, please try again in an hour!",
+//   store: new RedisStore({
+//     client: redisClient,
+//     prefix: "rate-limit:",
+//     sendCommand: (...args) => redisClient.sendCommand(args)
+//   })
+// }));
 
 // prevent parameter pollution
 
