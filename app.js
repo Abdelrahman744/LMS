@@ -1,5 +1,6 @@
 import express from "express";
 import morgan from "morgan";
+import mongoose from "mongoose";
 import bookRouter from "./routes/booksRoutes.js";
 import usersRouter from "./routes/usersRoutes.js";
 import borrowRouter from "./routes/borrowRoutes.js";
@@ -41,15 +42,32 @@ app.use(hpp({
 }));
 
 
+
 app.use(compression());
 
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 1) return next();
 
-// Routes
+  const timeout = 10000;
+  const start = Date.now();
+  while (mongoose.connection.readyState !== 1 && Date.now() - start < timeout) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
-app.use("/api/users", usersRouter); // User routes
-app.use("/api/books", bookRouter); // Book routes
-app.use("/api/borrow", borrowRouter); // Borrow routes
-app.use("/api/history", historyRouter); // History routes
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      status: "error",
+      message: "Database connection not ready. Please try again shortly.",
+    });
+  }
+  next();
+});
+
+
+app.use("/api/users", usersRouter);
+app.use("/api/books", bookRouter);
+app.use("/api/borrow", borrowRouter);
+app.use("/api/history", historyRouter);
 
 
 
